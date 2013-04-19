@@ -1,6 +1,20 @@
 // core.js - Essential shared functionality
 
-var Core = function() {
+var Core = function () {
+  
+  // properties
+  var ElementWrapper = function (el) {
+    return {
+      el: el,
+      template: Core.template,
+      tag: Core.tag,
+      elsByTag: Core.elsByTag,
+      attr: Core.attr,
+      val: Core.val
+    }
+  };
+  
+  // methods
   
   // Cross-browser XML parsing
   var parseXML = function (data) {
@@ -19,9 +33,13 @@ var Core = function() {
       
     // IE
     } else {
-      xml = new ActiveXObject("Microsoft.XMLDOM");
-      xml.async = "false";
-      xml.loadXML(data);
+      try {
+        xml = new ActiveXObject("Microsoft.XMLDOM");
+        xml.async = "false";
+        xml.loadXML(data);
+      } catch (e) {
+        console.log("BB ActiveX Exception: Could not parse XML");
+      }
     }
     
     if (!xml || !xml.documentElement || xml.getElementsByTagName("parsererror").length) {
@@ -29,20 +47,31 @@ var Core = function() {
       return null;
     }
     
-    return xml;
+    return wrapElement(xml);
   };
   
-  var emptyEl = function() {
-    el = document.createElement('empty');
-    el.elsByTag = Core.elsByTag;
-    el.tag = Core.tag;
-    el.attr = Core.attr;
-    el.val = Core.val;
-    return el;
+  var wrapElement = function (el) {
+    // el is an array of elements
+    if (el.length) {
+      var els = [];
+      for (var i = 0; i < el.length; i++) {
+        els.push(ElementWrapper(el[i]));
+      }
+      return els;
+    
+    // el is a single element
+    } else {
+      return ElementWrapper(el);
+    }
   };
   
-  var tagAttrVal = function (xmlDOM, tag, attr, value) {
-    var el = xmlDOM.getElementsByTagName(tag);
+  var emptyEl = function () {
+    var el = document.createElement('empty');
+    return wrapElement(el);
+  };
+  
+  var tagAttrVal = function (el, tag, attr, value) {
+    el = el.getElementsByTagName(tag);
     for (var i = 0; i < el.length; i++) {
       if (el[i].getAttribute(attr) === value) {
         return el[i];
@@ -50,43 +79,43 @@ var Core = function() {
     }
   };
   
-  var template = function(templateId) {
-    var el = tagAttrVal(this, 'templateId', 'root', templateId);
+  var template = function (templateId) {
+    var el = tagAttrVal(this.el, 'templateId', 'root', templateId);
     if (!el) {
       return emptyEl();
     } else {
-      return el.parentNode;
+      return wrapElement(el.parentNode);
     }
   };
   
-  var tag = function(tag) {
-    var el = this.getElementsByTagName(tag)[0];
+  var tag = function (tag) {
+    var el = this.el.getElementsByTagName(tag)[0];
     if (!el) {
       return emptyEl();
     } else {
-      return el;
+      return wrapElement(el);
     }
   };
   
-  var elsByTag = function(tag) {
-    return this.getElementsByTagName(tag);
+  var elsByTag = function (tag) {
+    return wrapElement(this.el.getElementsByTagName(tag));
   };
   
-  var attr = function(attr) {
-    if (!this) { return null; }
-    return this.getAttribute(attr);
+  var attr = function (attr) {
+    if (!this.el) { return null; }
+    return this.el.getAttribute(attr);
   };
   
-  var val = function() {
-    if (!this) { return null; }
+  var val = function () {
+    if (!this.el) { return null; }
     try {
-      return this.childNodes[0].nodeValue;
+      return this.el.childNodes[0].nodeValue;
     } catch (e) {
       return null;
     }
   };
   
-  var parseDate = function(str) {
+  var parseDate = function (str) {
     if (!str || typeof str !== "string") {
       console.log("Error: date is not a string");
       return null;
@@ -97,13 +126,28 @@ var Core = function() {
     return new Date(year, month, day);
   };
   
+  var trim = function (o) {
+    var y;
+    for (var x in o) {
+      y = o[x];
+      if (y === null || (y instanceof Object && Object.keys(y).length == 0)) {
+        delete o[x];
+      }
+      if (y instanceof Object) y = trim(y);
+    }
+    return o;
+  }
+  
   return {
     parseXML: parseXML,
+    wrapElement: wrapElement,
     template: template,
     tag: tag,
     elsByTag: elsByTag,
     attr: attr,
     val: val,
-    parseDate: parseDate
-  }
+    parseDate: parseDate,
+    trim: trim
+  };
+  
 }();

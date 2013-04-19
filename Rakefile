@@ -26,7 +26,7 @@ end
 desc "Build BlueButton.js"
 task :build do
   
-  puts "\nBuilding BlueButton.js".task, ""
+  puts "\nBuilding BlueButton.js".task
   
   manifest = File.open("manifest.json", "r") { |f| f.read }
   manifest = JSON.parse(manifest).symbolize_keys
@@ -34,26 +34,41 @@ task :build do
   # Contains the assembled JS
   dev_js = prod_js = manifest[:copyright] += "\n// v.#{manifest[:version]}\n\n"
   
+  # Check for compiler
+  if !File.exist?("vendor/compiler.jar")
+    
+    puts "  Could not find compiler!".error
+    
+    msg = <<-msg
+    
+    Google's Closure Compiler is needed to build BlueButton.js.
+    
+    1) Download it from:
+        http://closure-compiler.googlecode.com/files/compiler-latest.zip
+    2) Unzip and place 'compiler.jar' in the 'vendor' directory.
+    
+msg
+
+    puts msg
+    exit
+  end
+  
   ### COMPILER COMMANDS ###
   
   # Example:
   #   "java -jar compiler.jar --js hi.js --js_output_file hi.min.js"
-  compiler_cmd = "java -jar #{manifest[:compiler_path]}"
+  compiler_cmd = "java -jar vendor/compiler.jar"
   
-  puts "  Adding files:"
+  puts "", "  Adding files:"
   manifest[:files].each do |js_file|
     print "    #{js_file}.js\n"
     compiler_cmd << " --js #{manifest[:src_path]}#{js_file}.js"
   end
   
-  dev_cmd = prod_cmd = compiler_cmd
-  dev_cmd += " --compilation_level WHITESPACE_ONLY" <<
-             " --formatting PRETTY_PRINT"
+  ### PRODUCTION BUILD ###
   
-  ### DEVELOPMENT BUILD ###
-  
-  print "\n  Compiling development build..."
-  result = `#{dev_cmd << " 2>&1"}`
+  print "\n  Compiling production build..."
+  result = `#{compiler_cmd << " 2>&1"}`
   
   # If an error occurred
   unless $?.exitstatus.zero?
@@ -62,21 +77,24 @@ task :build do
     exit
   end
   
-  dev_js += result
-  dev_path = "#{manifest[:build_path]}bluebutton-#{manifest[:version]}-dev.js"
-  File.open(dev_path, "w") { |f| f.puts(dev_js) }
-  
-  print "done!"
-  
-  ### PRODUCTION BUILD ###
-  
-  print "\n  Compiling production build..."
-  result = `#{prod_cmd << " 2>&1"}`
-  
   # Add a closure
   prod_js += "\n(function () {\n" << result << "})();"
   prod_path = "#{manifest[:build_path]}bluebutton-#{manifest[:version]}.js"
   File.open(prod_path, "w") { |f| f.puts(prod_js) }
+  
+  print "done!"
+  
+  ### DEVELOPMENT BUILD ###
+  
+  print "\n  Assembling development build..."
+  
+  manifest[:files].each do |js_file|
+    dev_js << "\n\n" <<
+      File.open("#{manifest[:src_path]}#{js_file}.js", "r") { |f| f.read }
+  end
+  
+  dev_path = "#{manifest[:build_path]}bluebutton-#{manifest[:version]}-dev.js"
+  File.open(dev_path, "w") { |f| f.puts(dev_js) }
   
   print "done!"
   
@@ -109,9 +127,11 @@ end
 desc "Build One Pager"
 task :page do
   
-  puts "\nBuilding page BlueButton.html".task, ""
+  puts "\nBuilding page BlueButton.html".task
   
-  xml = File.open("sample_data/CCDA XML/hl7_ccd.xml", "r") { |f| f.read }
+  xml = File.open("sample_data/ccda/Greenway_CCDA_Adam_Everyman.xml", "r") { |f| f.read }
+  xml.gsub!('&','&amp;')
+  
   bbjs = File.open("build/bluebutton-latest-dev.js", "r") { |f| f.read }
   
   page = <<-page
@@ -147,7 +167,16 @@ page
   
   File.open("build/bluebutton.html", "w") { |f| f.puts(page) }
   
-  puts "  File written: build/bluebutton.html".success, ""
+  `cp build/bluebutton.html docs_server/public/`
+  
+  msg = <<-msg
+
+  Files written:
+    build/bluebutton.html
+    docs_server/public/bluebutton.html
+msg
+
+  puts msg.success
   
 end
 

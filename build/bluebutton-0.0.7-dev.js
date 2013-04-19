@@ -2,7 +2,7 @@
  * BlueButton.js
  */
 
-// v.0.0.9
+// v.0.0.7
 
 
 
@@ -175,10 +175,12 @@ var Allergies = function () {
     
     for (var i = 0; i < raw.length; i++) {
       data.push({
-        date_range: {
-          start: raw[i].start_date,
-          end: raw[i].end_date
+        date: {
+          value: null,
+          low: null,
+          high: null
         },
+        observation_date: { low: null },
         name: raw[i].name,
         code: raw[i].code,
         code_system: raw[i].code_system,
@@ -186,6 +188,7 @@ var Allergies = function () {
         status: raw[i].status,
         severity: raw[i].severity,
         reaction: {
+          date: { low: null },
           name: raw[i].reaction_name,
           code: raw[i].reaction_code,
           code_system: raw[i].reaction_code_system
@@ -216,10 +219,6 @@ var Allergies = function () {
     
     for (var i = 0; i < entries.length; i++) {
       entry = entries[i];
-      
-      el = entry.tag('effectiveTime');
-      var start_date = parseDate(el.tag('low').attr('value')),
-          end_date = parseDate(el.tag('high').attr('value'));
       
       el = entry.template('2.16.840.1.113883.10.20.22.4.7').tag('code');
       var name = el.attr('displayName'),
@@ -257,8 +256,6 @@ var Allergies = function () {
       
       data.push({
         name: name,
-        start_date: start_date,
-        end_date: end_date,
         code: code,
         code_system: code_system,
         code_system_name: code_system_name,
@@ -288,10 +285,6 @@ var Allergies = function () {
     
     for (var i = 0; i < entries.length; i++) {
       entry = entries[i];
-      
-      el = entry.tag('effectiveTime');
-      var start_date = el.tag('low').attr('value'),
-          end_date = el.tag('high').attr('value');
       
       el = entry.template('2.16.840.1.113883.10.20.1.28').tag('code');
       var name = el.tag('originalText').val(),
@@ -329,8 +322,6 @@ var Allergies = function () {
       
       data.push({
         name: name,
-        start_date: start_date,
-        end_date: end_date,
         code: code,
         code_system: code_system,
         code_system_name: code_system_name,
@@ -410,7 +401,6 @@ var Demographics = function () {
         mobile: data.mobile
       },
       email: data.email,
-      language: data.language,
       race: data.race,
       ethnicity: data.ethnicity,
       religion: data.religion,
@@ -451,20 +441,13 @@ var Demographics = function () {
   };
   
   var processCCDA = function (xmlDOM) {
-    var data = {}, el, els, patient;
+    var data = {}, el, patient;
     
     el = xmlDOM.template('2.16.840.1.113883.10.20.22.1.1');
     patient = el.tag('patientRole');
     el = patient.tag('patient').tag('name');
     data.prefix = el.tag('prefix').val();
-    
-    els = el.elsByTag('given');
-    data.given = [];
-    
-    for (var i = 0; i < els.length; i++) {
-      data.given.push(els[i].val());
-    }
-    
+    data.given = el.tag('given').val();
     data.family = el.tag('family').val();
     
     el = patient.tag('patient');
@@ -473,13 +456,7 @@ var Demographics = function () {
     data.marital_status = el.tag('maritalStatusCode').attr('displayName');
     
     el = patient.tag('addr');
-    els = el.elsByTag('streetAddressLine');
-    data.street = [];
-    
-    for (var i = 0; i < els.length; i++) {
-      data.street.push(els[i].val());
-    }
-    
+    data.street = el.tag('streetAddressLine').val();
     data.city = el.tag('city').val();
     data.state = el.tag('state').val();
     data.zip = el.tag('postalCode').val();
@@ -492,7 +469,6 @@ var Demographics = function () {
     
     data.email = null;
     
-    data.language = patient.tag('languageCommunication').tag('languageCode').attr('code');
     data.race = patient.tag('raceCode').attr('displayName');
     data.ethnicity = patient.tag('ethnicGroupCode').attr('displayName');
     data.religion = patient.tag('religiousAffiliationCode').attr('displayName');
@@ -506,25 +482,11 @@ var Demographics = function () {
     data.guardian_relationship = el.tag('code').attr('displayName');
     data.guardian_home = el.tag('telecom').attr('value');
     el = el.tag('guardianPerson');
-    
-    els = el.elsByTag('given');
-    data.guardian_given = [];
-    
-    for (var i = 0; i < els.length; i++) {
-      data.guardian_given.push(els[i].val());
-    }
-    
+    data.guardian_given = el.tag('given').val();
     data.guardian_family = el.tag('family').val();
     
     el = patient.tag('guardian').tag('addr');
-    
-    els = el.elsByTag('streetAddressLine');
-    data.guardian_street = [];
-    
-    for (var i = 0; i < els.length; i++) {
-      data.guardian_street.push(els[i].val());
-    }
-    
+    data.guardian_street = el.tag('streetAddressLine').val();
     data.guardian_city = el.tag('city').val();
     data.guardian_state = el.tag('state').val();
     data.guardian_zip = el.tag('postalCode').val();
@@ -533,14 +495,7 @@ var Demographics = function () {
     el = patient.tag('providerOrganization');
     data.provider_organization = el.tag('name').val();
     data.provider_phone = el.tag('telecom').attr('value');
-    
-    els = el.elsByTag('streetAddressLine');
-    data.provider_street = [];
-    
-    for (var i = 0; i < els.length; i++) {
-      data.provider_street.push(els[i].val());
-    }
-    
+    data.provider_street = el.tag('streetAddressLine').val();
     data.provider_city = el.tag('city').val();
     data.provider_state = el.tag('state').val();
     data.provider_zip = el.tag('postalCode').val();
@@ -550,20 +505,14 @@ var Demographics = function () {
   };
   
   var processVAC32 = function (xmlDOM) {
-    var data = {}, el, els, patient;
+    var data = {}, el, patient;
     
     el = xmlDOM.template('1.3.6.1.4.1.19376.1.5.3.1.1.1');
     patient = el.tag('patientRole');
+    
     el = patient.tag('patient').tag('name');
-    data.prefix = el.tag('prefix').val();
-    
-    els = el.elsByTag('given');
-    data.given = [];
-    
-    for (var i = 0; i < els.length; i++) {
-      data.given.push(els[i].val());
-    }
-    
+    data.prefix = null;
+    data.given = el.tag('given').val();
     data.family = el.tag('family').val();
     
     el = patient.tag('patient');
@@ -572,13 +521,7 @@ var Demographics = function () {
     data.marital_status = el.tag('maritalStatusCode').attr('displayName');
     
     el = patient.tag('addr');
-    els = el.elsByTag('streetAddressLine');
-    data.street = [];
-    
-    for (var i = 0; i < els.length; i++) {
-      data.street.push(els[i].val());
-    }
-    
+    data.street = el.tag('streetAddressLine').val();
     data.city = el.tag('city').val();
     data.state = el.tag('state').val();
     data.zip = el.tag('postalCode').val();
@@ -591,7 +534,6 @@ var Demographics = function () {
     
     data.email = null;
     
-    data.language = patient.tag('languageCommunication').tag('languageCode').attr('code');
     data.race = patient.tag('raceCode').attr('displayName');
     data.ethnicity = patient.tag('ethnicGroupCode').attr('displayName');
     data.religion = patient.tag('religiousAffiliationCode').attr('displayName');
@@ -605,25 +547,11 @@ var Demographics = function () {
     data.guardian_relationship = el.tag('code').attr('displayName');
     data.guardian_home = el.tag('telecom').attr('value');
     el = el.tag('guardianPerson');
-    
-    els = el.elsByTag('given');
-    data.guardian_given = [];
-    
-    for (var i = 0; i < els.length; i++) {
-      data.guardian_given.push(els[i].val());
-    }
-    
+    data.guardian_given = el.tag('given').val();
     data.guardian_family = el.tag('family').val();
     
     el = patient.tag('guardian').tag('addr');
-    
-    els = el.elsByTag('streetAddressLine');
-    data.guardian_street = [];
-    
-    for (var i = 0; i < els.length; i++) {
-      data.guardian_street.push(els[i].val());
-    }
-    
+    data.guardian_street = el.tag('streetAddressLine').val();
     data.guardian_city = el.tag('city').val();
     data.guardian_state = el.tag('state').val();
     data.guardian_zip = el.tag('postalCode').val();
@@ -632,14 +560,7 @@ var Demographics = function () {
     el = patient.tag('providerOrganization');
     data.provider_organization = el.tag('name').val();
     data.provider_phone = el.tag('telecom').attr('value');
-    
-    els = el.elsByTag('streetAddressLine');
-    data.provider_street = [];
-    
-    for (var i = 0; i < els.length; i++) {
-      data.provider_street.push(els[i].val());
-    }
-    
+    data.provider_street = el.tag('streetAddressLine').val();
     data.provider_city = el.tag('city').val();
     data.provider_state = el.tag('state').val();
     data.provider_zip = el.tag('postalCode').val();
@@ -723,9 +644,9 @@ var Encounters = function () {
   };
   
   var processCCDA = function (xmlDOM) {
-    var data = [], el, els, entries, entry;
+    var data = [], el, entries, entry;
     
-    el = xmlDOM.template('2.16.840.1.113883.10.20.22.2.22');
+    el = xmlDOM.template('2.16.840.1.113883.10.20.22.2.22.1');
     entries = el.elsByTag('entry');
     
     for (var i = 0; i < entries.length; i++) {
@@ -762,16 +683,9 @@ var Encounters = function () {
 
       // participant => location
       el = entry.tag('participant');
-      var organization = el.tag('code').attr('displayName');
-      
-      els = el.elsByTag('streetAddressLine');
-      street = [];
-      
-      for (var j = 0; j < els.length; j++) {
-        street.push(els[j].val());
-      }
-      
-      var city = el.tag('city').val(),
+      var organization = el.tag('code').attr('displayName'),
+          street = el.tag('streetAddressLine').val(),
+          city = el.tag('city').val(),
           state = el.tag('state').val(),
           zip = el.tag('postalCode').val(),
           country = el.tag('country').val();
@@ -806,7 +720,7 @@ var Encounters = function () {
   };
   
  var processVAC32 = function (xmlDOM) {
-   var data = [], el, els, entries, entry;
+   var data = [], el, entries, entry;
     
     el = xmlDOM.template('2.16.840.1.113883.10.20.1.3');
     entries = el.elsByTag('entry');
@@ -845,16 +759,9 @@ var Encounters = function () {
 
       // participant => location
       el = entry.tag('participant');
-      var organization = el.tag('code').attr('displayName');
-      
-      els = el.elsByTag('streetAddressLine');
-      street = [];
-      
-      for (var j = 0; j < els.length; j++) {
-        street.push(els[j].val());
-      }
-      
-      var city = el.tag('city').val(),
+      var organization = el.tag('code').attr('displayName'),
+          street = el.tag('streetAddressLine').val(),
+          city = el.tag('city').val(),
           state = el.tag('state').val(),
           zip = el.tag('postalCode').val(),
           country = el.tag('country').val();
@@ -960,7 +867,7 @@ var Immunizations = function () {
   var processCCDA = function (xmlDOM) {
     var data = [], el, entries, entry;
     
-    el = xmlDOM.template('2.16.840.1.113883.10.20.22.2.2.1');
+    el = xmlDOM.template('2.16.840.1.113883.10.20.22.2.2');
     entries = el.elsByTag('entry');
     
     for (var i = 0; i < entries.length; i++) {
@@ -1188,7 +1095,7 @@ var Labs = function () {
             code_system_name = el.attr('codeSystemName');
         
         el = result.tag('value');
-        var value = parseInt(el.attr('value')),
+        var value = el.attr('value'),
             unit = el.attr('unit');
         
         // reference range may not be present
@@ -1249,7 +1156,7 @@ var Labs = function () {
             code_system_name = el.attr('codeSystemName');
         
         el = result.tag('value');
-        var value = parseInt(el.attr('value')),
+        var value = el.attr('value'),
             unit = el.attr('unit');
         
         // reference range may not be present
@@ -1318,9 +1225,9 @@ var Medications = function () {
     
     for (var i = 0; i < raw.length; i++) {
       data.push({
-        date_range: {
-          start: raw[i].start_date,
-          end: raw[i].end_date
+        effective_time: {
+          low: raw[i].low,
+          high: raw[i].high
         },
         product: {
           name: raw[i].product_name,
@@ -1389,8 +1296,8 @@ var Medications = function () {
       entry = entries[i];
       
       el = entry.tag('effectiveTime');
-      var start_date = parseDate(el.tag('low').attr('value')),
-          end_date = parseDate(el.tag('high').attr('value'));
+      var low = parseDate(el.tag('low').attr('value')),
+          high = parseDate(el.tag('high').attr('value'));
       
       el = entry.tag('manufacturedProduct').tag('code');
       var product_name = el.attr('displayName'),
@@ -1446,8 +1353,8 @@ var Medications = function () {
           prescriber_person = null;
       
       data.push({
-        start_date: start_date,
-        end_date: end_date,
+        low: low,
+        high: high,
         product_name: product_name,
         product_code: product_code,
         product_code_system: product_code_system,
@@ -1495,8 +1402,8 @@ var Medications = function () {
       entry = entries[i];
       
       el = entry.tag('effectiveTime');
-      var start_date = parseDate(el.tag('low').attr('value')),
-          end_date = parseDate(el.tag('high').attr('value'));
+      var low = parseDate(el.tag('low').attr('value')),
+          high = parseDate(el.tag('high').attr('value'));
       
       el = entry.tag('manufacturedProduct').tag('code');
       var product_name = el.attr('displayName'),
@@ -1552,8 +1459,8 @@ var Medications = function () {
           prescriber_person = null;
       
       data.push({
-        start_date: start_date,
-        end_date: end_date,
+        low: low,
+        high: high,
         product_name: product_name,
         product_code: product_code,
         product_code_system: product_code_system,
@@ -1629,9 +1536,9 @@ var Problems = function () {
     
     for (var i = 0; i < raw.length; i++) {
       data.push({
-        date_range: {
-          start: raw[i].start_date,
-          end: raw[i].end_date
+        date: {
+          from: raw[i].from,
+          to: raw[i].to
         },
         name: raw[i].name,
         status: raw[i].status,
@@ -1647,15 +1554,15 @@ var Problems = function () {
   var processCCDA = function (xmlDOM) {
     var data = [], el, entries, entry;
     
-    el = xmlDOM.template('2.16.840.1.113883.10.20.22.2.5.1');
+    el = xmlDOM.template('2.16.840.1.113883.10.20.22.2.5');
     entries = el.elsByTag('entry');
     
     for (var i = 0; i < entries.length; i++) {
       entry = entries[i];
       
       el = entry.tag('effectiveTime');
-      var start_date = parseDate(el.tag('low').attr('value')),
-          end_date = parseDate(el.tag('high').attr('value'));
+      var from = parseDate(el.tag('low').attr('value')),
+          to = parseDate(el.tag('high').attr('value'));
       
       el = entry.template('2.16.840.1.113883.10.20.22.4.4').tag('code');
       var name = el.attr('displayName'),
@@ -1669,8 +1576,8 @@ var Problems = function () {
       var age = parseInt(el.tag('value').attr('value'));
       
       data.push({
-        start_date: start_date,
-        end_date: end_date,
+        from: from,
+        to: to,
         name: name,
         code: code,
         code_system: code_system,
@@ -1691,8 +1598,8 @@ var Problems = function () {
       entry = entries[i];
       
       el = entry.tag('effectiveTime');
-      var start_date = parseDate(el.tag('low').attr('value')),
-          end_date = parseDate(el.tag('high').attr('value'));
+      var from = parseDate(el.tag('low').attr('value')),
+          to = parseDate(el.tag('high').attr('value'));
       
       el = entry.template('2.16.840.1.113883.10.20.1.28').tag('code');
       var name = el.tag('originalText').val(),
@@ -1706,8 +1613,8 @@ var Problems = function () {
       var age = parseInt(el.tag('value').attr('value'));
       
       data.push({
-        start_date: start_date,
-        end_date: end_date,
+        from: from,
+        to: to,
         name: name,
         code: code,
         code_system: code_system,
@@ -1786,9 +1693,9 @@ var Procedures = function () {
   };
   
   var processCCDA = function (xmlDOM) {
-    var data = [], el, els, entries, entry;
+    var data = [], el, entries, entry;
     
-    el = xmlDOM.template('2.16.840.1.113883.10.20.22.2.7.1');
+    el = xmlDOM.template('2.16.840.1.113883.10.20.22.2.7');
     entries = el.elsByTag('entry');
     
     for (var i = 0; i < entries.length; i++) {
@@ -1811,18 +1718,11 @@ var Procedures = function () {
           specimen_code = null,
           specimen_code_system = null;
       
-      el = entry.tag('performer').tag('addr');
+      el = entry.tag('performer');
       var organization = el.tag('name').val(),
-          phone = el.tag('telecom').attr('value');
-      
-      els = el.elsByTag('streetAddressLine');
-      street = [];
-      
-      for (var j = 0; j < els.length; j++) {
-        street.push(els[j].val());
-      }
-          
-      var city = el.tag('city').val(),
+          phone = el.tag('telecom').attr('value'),
+          street = el.tag('streetAddressLine').val(),
+          city = el.tag('city').val(),
           state = el.tag('state').val(),
           zip = el.tag('postalCode').val(),
           country = el.tag('country').val();
@@ -1857,7 +1757,7 @@ var Procedures = function () {
   };
   
   var processVAC32 = function (xmlDOM) {
-    var data = [], el, els, entries, entry;
+    var data = [], el, entries, entry;
     
     el = xmlDOM.template('2.16.840.1.113883.10.20.1.12');
     entries = el.elsByTag('entry');
@@ -1882,18 +1782,11 @@ var Procedures = function () {
           specimen_code = null,
           specimen_code_system = null;
       
-      el = entry.tag('performer').tag('addr');
+      el = entry.tag('performer');
       var organization = el.tag('name').val(),
-          phone = el.tag('telecom').attr('value');
-      
-      els = el.elsByTag('streetAddressLine');
-      street = [];
-      
-      for (var j = 0; j < els.length; j++) {
-        street.push(els[j].val());
-      }
-          
-      var city = el.tag('city').val(),
+          phone = el.tag('telecom').attr('value'),
+          street = el.tag('streetAddressLine').val(),
+          city = el.tag('city').val(),
           state = el.tag('state').val(),
           zip = el.tag('postalCode').val(),
           country = el.tag('country').val();
@@ -2017,7 +1910,7 @@ var Vitals = function () {
             code_system_name = el.attr('codeSystemName');
         
         el = result.tag('value');
-        var value = parseInt(el.attr('value')),
+        var value = el.attr('value'),
             unit = el.attr('unit');
         
         results_data.push({
@@ -2065,7 +1958,7 @@ var Vitals = function () {
             code_system_name = el.attr('codeSystemName');
         
         el = result.tag('value');
-        var value = parseInt(el.attr('value')),
+        var value = el.attr('value'),
             unit = el.attr('unit');
         
         results_data.push({
